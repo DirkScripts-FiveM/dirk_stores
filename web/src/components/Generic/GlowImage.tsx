@@ -1,59 +1,38 @@
-import { Flex, Image, ImageProps } from "@mantine/core";
+import { Flex, Image } from '@mantine/core';
 import NothingPNG from '../Store/nothing.png';
-type GlowImageProps = ImageProps & {
+
+export type GlowImageProps = {
+  src: string;
   alt?: string;
-}
+  /** Height of the sharp copy. The blurred copy sits behind it, larger. */
+  size?: string;
+};
 
-export default function GlowImage(props: GlowImageProps) {
+/**
+ * An item picture with a soft bloom of itself behind it — the thing that makes
+ * a flat inventory PNG read as lit rather than pasted on.
+ */
+export default function GlowImage({ src, alt, size = '11vh' }: GlowImageProps) {
   return (
-    <Flex
-      w='fit-content'
-      pos='absolute'
-      // w='12vh'
-      // bg='blue'
-      h='12vh'
-      top='40%'
-      left='50%'
-      justify='center'
-      align='center'
-      style={{
-        // aspectRatio: '1 / 1',
-        transform: 'translate(-50%, -50%)',
-      }}
-    >
+    <Flex w="100%" h="100%" justify="center" align="center" pos="relative">
       <Image
-        // w='12vh'
-        h='12vh'
-        // bg='red'
-        style={{
-
-          // scale but use static value so it doesn't change with zoom
-
-          // filter: 'blur(50px)',
-          zIndex: 2,
-          opacity: 1,
-          
-        }}
-        src={props.src}
+        pos="absolute"
+        h={`calc(${size} * 1.5)`}
+        w={`calc(${size} * 1.5)`}
+        fit="contain"
+        src={src}
         fallbackSrc={NothingPNG}
-        alt={props.alt || 'Glow Image'}
+        alt=""
+        style={{ filter: 'blur(1.5vh)', opacity: 0.35, zIndex: 1 }}
       />
       <Image
-        pos='absolute'
-        // w='16vh'
-        h='18vh'
-        // bg='green'
-        style={{
-          // scale but use static value so it doesn't change with zoom
-
-          filter: 'blur(1.5vh)',
-          zIndex: 1,
-          opacity: 0.4,
-          
-        }}
-        src={props.src}
+        h={size}
+        w={size}
+        fit="contain"
+        src={src}
         fallbackSrc={NothingPNG}
-        alt={props.alt || 'Glow Image'}
+        alt={alt ?? ''}
+        style={{ zIndex: 2 }}
       />
     </Flex>
   );

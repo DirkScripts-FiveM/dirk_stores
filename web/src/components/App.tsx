@@ -1,102 +1,37 @@
-import { BackgroundImage, Flex, MantineProvider, Text } from '@mantine/core';
-import '@mantine/dates/styles.css';
 import '@mantine/notifications/styles.css';
-import React, { useEffect, useState } from "react";
-
-import { localeStore } from '../stores/locales';
-import { useSettings } from '../stores/settings';
-import theme from '../theme';
-import { isEnvBrowser } from '../utils/misc';
-import "./App.css";
+import { Notifications } from '@mantine/notifications';
+import { DirkProvider, isEnvBrowser, localeStore } from 'dirk-cfx-react';
+import React, { useEffect } from 'react';
+import enLocale from '@locales/en.json';
+import './App.css';
 import StoreUI from './Store/main';
-import { motion } from 'framer-motion';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-
-// motion Flex
-// @ts-expect-error Motion doesn't like Mantine's Flex
-export const MotionFlex = motion(Flex);
-// @ts-expect-error Motion doesnt like
-export const MotionText = motion(Text);
-
-
-export const MotionIcon = motion(FontAwesomeIcon);
-
-// @ts-expect-error Motion doesnt like
-export const MotionImage = motion(Image);
 
 const App: React.FC = () => {
-  const [curTheme, setCurTheme] = useState(theme);
-  const primaryColor = useSettings((data) => data.primaryColor);
-  const primaryShade = useSettings((data) => data.primaryShade);
-  const customTheme = useSettings((data) => data.customTheme);
-  const game = useSettings((data) => data.game);
+  // In the browser there is no Lua to answer GET_LOCALES, so seed the bundle
+  // from the shipped English file — otherwise every label renders as its key.
   useEffect(() => {
-    const fontFamily =
-      game === 'rdr3' ? '"Red Dead", sans-serif' :
-      game === 'fivem' ? '"Akrobat Regular", sans-serif' :
-      'sans-serif';
-
-    document.body.style.fontFamily = fontFamily;
-    document.body.classList.toggle('game-rdr3', game === 'rdr3');
-
-  }, [game]);
-  
-  const fetchSettings = useSettings((state) => state.fetchSettings);
-  const fetchLocales  = localeStore((state) => state.fetchLocales);
-  // Ensure the theme is updated when the settings change
-
-  useEffect(() => {
-    const updatedTheme = {
-      ...theme, // Start with the existing theme object
-      colors: {
-        ...theme.colors, // Copy the existing colors
-        custom: customTheme
-      },
-    };
-    
-    setCurTheme(updatedTheme);
-    // set primary color
-    setCurTheme({
-      ...updatedTheme,
-      primaryColor: primaryColor,
-      primaryShade: primaryShade,
-    });
-  }, [primaryColor, primaryShade, customTheme]);
-
-
-
-  useEffect(() => {
-    fetchSettings();
-    fetchLocales();
-  }, [fetchSettings, fetchLocales]);
+    if (isEnvBrowser()) {
+      localeStore.setState({ locales: enLocale as Record<string, string> });
+    }
+  }, []);
 
   return (
-    <MantineProvider theme={curTheme} defaultColorScheme='dark'>
-      <Wrapper>
-        <StoreUI />
-  
-      </Wrapper>
-    </MantineProvider>
+    <DirkProvider>
+      <Notifications
+        position="bottom-center"
+        styles={{
+          notification: {
+            backgroundColor: 'rgba(38, 38, 38, 0.8)',
+            borderRadius: 'var(--mantine-radius-xs)',
+            padding: 'var(--mantine-spacing-xs)',
+            paddingLeft: 'var(--mantine-spacing-md)',
+            boxShadow: '0 2px 10px rgba(0, 0, 0, 0.5)',
+          },
+        }}
+      />
+      <StoreUI />
+    </DirkProvider>
   );
 };
-
-
-
-function Wrapper({ children }: { children: React.ReactNode }) {
-  const game = useSettings((state) => state.game);
-  return isEnvBrowser() ? ( 
-    <BackgroundImage w='100vw' mah='100vh' mih='100vh' style={{overflow:'hidden'}}
-      src={
-        game === 'fivem' ?
-        "https://i.ytimg.com/vi/TOxuNbXrO28/maxresdefault.jpg"
-        : "https://raw.githubusercontent.com/Jump-On-Studios/RedM-jo_libs/refs/heads/main/source-repositories/Menu/public/assets/images/background_dev.jpg"
-      }
-    >  
-      {children}
-    </BackgroundImage>
-  ) : (
-    <>{children}</>
-  )
-}
 
 export default App;

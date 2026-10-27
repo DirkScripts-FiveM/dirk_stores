@@ -1,247 +1,231 @@
-import { Flex, Image, Text, useMantineTheme } from "@mantine/core";
-import { useEffect } from "react";
-import { locale } from "../../stores/locales";
-import { useSettings } from "../../stores/settings";
-import Button from "../Generic/Button";
-import CustomFlex from "../Generic/CustomFlex";
-import { ItemProps, useStore } from "./useStore";
-import NothingPNG from './nothing.png'
-import { motion, AnimatePresence } from "framer-motion";
-
+import type { CartLine } from '@/types/store';
+import { alpha, Flex, Image, Text, useMantineTheme } from '@mantine/core';
+import { getItemImageUrl, locale, resolveItemLabel, useItems, useSettings } from 'dirk-cfx-react';
+import { money } from '@/utils/money';
+import { AnimatePresence, motion } from 'framer-motion';
+import { HandCoins, Minus, Plus, ShoppingCart, Trash2 } from 'lucide-react';
+import { useEffect } from 'react';
+import Button from '../Generic/Button';
+import NothingPNG from './nothing.png';
+import { cartTotal, useStore } from './useStore';
 
 export default function Checkout() {
-  const game = useSettings((data) => data.game);
-  const cart = useStore((data) => data.cart);
-  const type = useStore((data) => data.type);
-  const totalPrice = useStore((data) =>
-    data.cart.reduce((total, item) => total + item.price * item.quantity, 0)
-  );
+  const theme = useMantineTheme();
+  const accent = theme.colors[theme.primaryColor][5];
 
-  const selectedMethod = useStore((data) => data.selectedMethod);
-  const paymentMethods = useStore((data) => data.paymentMethods);
+  const cart = useStore((state) => state.cart);
+  const type = useStore((state) => state.type);
+  const checkout = useStore((state) => state.checkout);
+  const clearCart = useStore((state) => state.clearCart);
+  const selectedMethod = useStore((state) => state.selectedMethod);
+  const paymentMethods = useStore((state) => state.paymentMethods);
+
+  const total = cartTotal(cart);
+  const buying = type === 'buy';
+
   useEffect(() => {
-    // default to the first payment method if none is selected
     if (!selectedMethod && paymentMethods.length > 0) {
       useStore.setState({ selectedMethod: paymentMethods[0] });
     }
   }, [selectedMethod, paymentMethods]);
 
-  const checkout = useStore((data) => data.checkout);
+  const empty = cart.length === 0;
+
+  // Buying with more in the basket than you can pay for is the one failure the
+  // UI can catch before the server does, so say it here rather than bouncing.
+  // An empty basket costs nothing, so it is never unaffordable — saying so on
+  // a £0 total reads as an error before you have even picked anything up.
+  const balance = selectedMethod?.balance;
+  const cannotAfford = buying && !empty && total > 0 && typeof balance === 'number' && total > balance;
+
   return (
     <Flex
-      direction='column'
-      flex={0.3}
-      gap='sm'
-      p='xs'
-      // bg='green'
-    >
-      <Text
-        size='md'
-        style={{
-          fontFamily: game === 'fivem' ? 'Akrobat Black' : 'Red Dead',
-        }}
-      >{locale(type == 'buy' ? 'Checkout' : 'Items to Sell')}</Text>
-
-
-      <Flex
-        direction={'column'}
-        gap='sm'
-        // mah='75vh'
-        mih='60vh'
-        mah='60vh'
-        pr='xxs'
-        style={{
-          overflowY: 'auto',
-        }}
-      >
-        <AnimatePresence mode="popLayout">
-          {cart.map((item) => (
-            <motion.div
-              key={item.id}
-              layout
-              initial={{ opacity: 0, y: -20, scale: 0.95 }}
-              animate={{ 
-                opacity: 1, 
-                y: 0, 
-                scale: 1,
-                transition: {
-                  type: "spring",
-                  stiffness: 300,
-                  damping: 30
-                }
-              }}
-              exit={{ 
-                opacity: 0, 
-                x: -100, 
-                scale: 0.95,
-                transition: {
-                  duration: 0.2,
-                  ease: "easeInOut"
-                }
-              }}
-            >
-              <CheckoutItem
-                key={item.id}
-                {...item}
-              />
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </Flex>
-      <Flex
-        mt='auto'
-        align='center'
-        justify='space-between'
-      >
-        <Flex
-          direction={'column'}
-        >
-          <Text
-            style={{
-              fontFamily: game === 'fivem' ? 'Akrobat Bold' : 'Red Dead',
-            }}
-          >{locale('Payment')}</Text>
-          <Text
-            size='sm'
-            c='rgba(255, 255, 255, 0.7)'
-          >
-            {locale('TotalPrice')}
-          </Text>
-        </Flex>
-        <Text
-          fw={600}
-        >
-          {selectedMethod?.symbol}{' '}
-          <AnimatePresence mode="wait">
-            <motion.span
-              key={totalPrice} // This triggers re-animation when totalPrice changes
-              initial={{ opacity: 0, y: -10, scale: 0.9 }}
-              animate={{ 
-                opacity: 1, 
-                y: 0, 
-                scale: 1,
-                transition: {
-                  duration: 0.3,
-                  ease: "easeOut"
-                }
-              }}
-              exit={{ 
-                opacity: 0, 
-                y: 10, 
-                scale: 0.9,
-                transition: {
-                  duration: 0.15,
-                  ease: "easeIn"
-                }
-              }}
-            >
-              {totalPrice}
-            </motion.span>
-          </AnimatePresence>
-        </Text>
-      </Flex>
-      <Button
-        size='sm'
-        label={type === 'buy' ? locale('Buy').toUpperCase() : locale('Sell').toUpperCase()}
-        icon={type === 'buy' ? 'fa-shopping-cart' : 'fa-hand-holding-dollar'}
-        onClick={() => {
-          checkout();
-        }}
-      />
-    </Flex>
-  )
-}
-
-function CheckoutItem(props: ItemProps & { quantity: number }) {
-  const theme = useMantineTheme();
-  const selectedMethod = useStore((data) => data.selectedMethod);
-  const addToCart = useStore((state) => state.addToCart);
-  const removeFromCart = useStore((state) => state.removeFromCart);
-  const itemImgPath = useSettings((data) => data.itemImgPath);
-
-  const game = useSettings((data) => data.game);
-  return (
-    <CustomFlex
-      bg='rgba(77, 77, 77, 0.5)'
-      pr={game == 'rdr3' ? 'lg' : 'sm'}
-      pl={game == 'rdr3' ? 'md' : 'sm'}
-      align='center'
-      p='sm'
-      gap='xs'
+      direction="column"
+      w="34vh"
       style={{
-        borderRadius: theme.radius.xxs,
+        background: 'linear-gradient(180deg, rgba(20,20,20,0.82) 0%, rgba(10,10,10,0.9) 100%)',
+        border: '1px solid rgba(255,255,255,0.07)',
+        borderRadius: theme.radius.sm,
+        overflow: 'hidden',
       }}
     >
-      <Image
-        src={`${itemImgPath}${props.name}.png`}
-        alt={props.name}
-        fallbackSrc={NothingPNG}
-        fz='xxs'
-        w='5vh'
-        h='5vh'
-        style={{
-          objectFit: 'contain',
-        }}
-      />
       <Flex
-        direction='column'
+        align="center"
+        gap="xs"
+        px="sm"
+        py="xs"
+        style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
       >
-        <Text
-          size='sm'
-          style={{
-            fontFamily: game === 'fivem' ? 'Akrobat Bold' : 'Red Dead',
-          }}
-        >{props.label}</Text>
-        <Text
-          c='rgba(255, 255, 255, 0.7)'
-          size='xs'
-          fw={500}
-        >{selectedMethod?.symbol}{props.price * props.quantity}</Text>
+        {buying ? <ShoppingCart size="1.8vh" strokeWidth={2.2} color={accent} />
+          : <HandCoins size="1.8vh" strokeWidth={2.2} color={accent} />}
+        <Text size="sm" ff="Akrobat Bold" tt="uppercase" lts="0.08em" c="rgba(255,255,255,0.9)">
+          {locale(buying ? 'Checkout' : 'ItemsToSell')}
+        </Text>
+        {!empty && (
+          <Trash2
+            size="1.6vh"
+            strokeWidth={2.2}
+            color="rgba(255,255,255,0.35)"
+            style={{ marginLeft: 'auto', cursor: 'pointer' }}
+            onClick={clearCart}
+          />
+        )}
       </Flex>
 
+      <Flex flex={1} direction="column" gap="xs" p="xs" style={{ overflowY: 'auto', minHeight: 0 }}>
+        {empty ? (
+          <Flex flex={1} direction="column" align="center" justify="center" gap="xs" c="rgba(255,255,255,0.3)">
+            <ShoppingCart size="4vh" strokeWidth={1.4} />
+            <Text size="xxs" tt="uppercase" lts="0.08em" ta="center" px="md">
+              {locale(buying ? 'CartIsEmpty' : 'NothingToSellYet')}
+            </Text>
+          </Flex>
+        ) : (
+          <AnimatePresence mode="popLayout">
+            {cart.map((line) => (
+              <motion.div
+                key={line.id}
+                layout
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0, transition: { type: 'spring', stiffness: 320, damping: 30 } }}
+                exit={{ opacity: 0, x: -40, transition: { duration: 0.15 } }}
+              >
+                <CheckoutLine {...line} />
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        )}
+      </Flex>
 
       <Flex
-        ml='auto'
-        gap='xxs'
-        align='center'
+        direction="column"
+        gap="xs"
+        p="sm"
+        style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}
       >
+        <Flex align="flex-end" justify="space-between">
+          <Flex direction="column">
+            <Text size="xxs" tt="uppercase" lts="0.08em" c="rgba(255,255,255,0.45)">
+              {locale(buying ? 'TotalPrice' : 'TotalPayout')}
+            </Text>
+            {/* One line, always present. The warning replaces the method name
+                rather than being added underneath it — appearing as a new row
+                shoved the Buy button down the moment the basket got too big. */}
+            <Text size="xxs" c={cannotAfford ? theme.colors.red[5] : 'rgba(255,255,255,0.35)'}>
+              {cannotAfford ? locale('CannotAfford') : (selectedMethod?.name ?? '')}
+            </Text>
+          </Flex>
+
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={total}
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 6 }}
+              transition={{ duration: 0.18 }}
+            >
+              <Text size="lg" ff="Akrobat Black" c={cannotAfford ? theme.colors.red[5] : 'white'} lh={1}>
+                {money(total, selectedMethod)}
+              </Text>
+            </motion.div>
+          </AnimatePresence>
+        </Flex>
+
         <Button
-          icon='minus'
-          onClick={() => removeFromCart(props.id, 1)}
+          fullWidth
+          size="sm"
+          disabled={empty || cannotAfford}
+          label={locale(buying ? 'Buy' : 'Sell')}
+          icon={buying ? ShoppingCart : HandCoins}
+          color={alpha(accent, 1)}
+          onClick={checkout}
         />
+      </Flex>
+    </Flex>
+  );
+}
+
+function CheckoutLine(line: CartLine) {
+  const theme = useMantineTheme();
+  const addToCart = useStore((state) => state.addToCart);
+  const removeFromCart = useStore((state) => state.removeFromCart);
+  const setCartQuantity = useStore((state) => state.setCartQuantity);
+  const selectedMethod = useStore((state) => state.selectedMethod);
+  const itemImgPath = useSettings((state) => state.itemImgPath);
+  const items = useItems();
+
+  const label = resolveItemLabel(items, line.name, line.label);
+  const image = getItemImageUrl(line.name) || `${itemImgPath}${line.name}.png`;
+
+  return (
+    <Flex
+      align="center"
+      gap="xs"
+      p="xs"
+      style={{
+        background: 'rgba(255,255,255,0.04)',
+        border: '1px solid rgba(255,255,255,0.05)',
+        borderRadius: theme.radius.xs,
+      }}
+    >
+      <Image src={image} fallbackSrc={NothingPNG} alt={label} w="4.5vh" h="4.5vh" fit="contain" />
+
+      <Flex direction="column" style={{ minWidth: 0 }}>
+        <Text size="xs" ff="Akrobat Bold" lineClamp={1} c="rgba(255,255,255,0.9)">{label}</Text>
+        <Text size="xxs" c="rgba(255,255,255,0.5)">
+          {money(line.price * line.quantity, selectedMethod)}
+        </Text>
+      </Flex>
+
+      <Flex ml="auto" align="center" gap="xxs">
+        <Stepper icon={Minus} onClick={() => removeFromCart(line.id, 1)} />
         <input
+          value={line.quantity}
+          onChange={(event) => {
+            const next = parseInt(event.target.value, 10);
+            setCartQuantity(line.id, Number.isNaN(next) ? 0 : next);
+          }}
           style={{
-            width: '3.5vh',
-            height: '3.5vh',
-            fontSize: '1.5vh',
+            width: '3.4vh',
+            height: '2.8vh',
+            fontSize: '1.4vh',
+            fontFamily: 'Akrobat Bold',
             textAlign: 'center',
-            backgroundColor: 'rgba(77, 77, 77, 0.4)',
+            background: 'rgba(0,0,0,0.4)',
+            border: '1px solid rgba(255,255,255,0.06)',
+            borderRadius: theme.radius.xs,
             outline: 'none',
-            border: 'none',
-            color: 'rgba(255, 255, 255, 0.9)',
+            color: 'rgba(255,255,255,0.9)',
           }}
-          value={props.quantity}
-          onChange={(e) => {
-            const value = parseInt(e.target.value);
-            if (!isNaN(value) && value > 0) {
-              addToCart(props, value - props.quantity);
-            } else if (value <= 0) {
-              removeFromCart(props.id, props.quantity);
-            }
-          }}
-     
         />
-        <Button
-          icon='plus'
-          onClick={() => addToCart(props, 1)}  
-        
-        />
-        <Button
-          color='#ff4d4d'
-          onClick={() => removeFromCart(props.id, props.quantity)}
-          icon='trash'
-        />
+        <Stepper icon={Plus} onClick={() => addToCart(line, 1)} />
+        <Stepper icon={Trash2} danger onClick={() => removeFromCart(line.id, Number.MAX_SAFE_INTEGER)} />
       </Flex>
-    </CustomFlex>
-  )
+    </Flex>
+  );
+}
+
+function Stepper({ icon: Icon, onClick, danger }: { icon: React.ElementType; onClick: () => void; danger?: boolean }) {
+  const theme = useMantineTheme();
+  const color = danger ? theme.colors.red[5] : 'rgba(255,255,255,0.7)';
+
+  return (
+    <motion.div
+      whileHover={{ scale: 1.12 }}
+      whileTap={{ scale: 0.9 }}
+      onClick={onClick}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '2.8vh',
+        height: '2.8vh',
+        borderRadius: theme.radius.xs,
+        background: danger ? alpha(theme.colors.red[9], 0.25) : 'rgba(255,255,255,0.06)',
+        cursor: 'pointer',
+      }}
+    >
+      <Icon size="1.5vh" strokeWidth={2.4} color={color} />
+    </motion.div>
+  );
 }

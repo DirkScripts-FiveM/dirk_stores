@@ -1,0 +1,1471 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "x-label": "Stores",
+  "x-icon": "store",
+  "type": "object",
+  "description": "Shops players buy from and sell to — where they are, who staffs them, what they stock and how they are paid.",
+  "x-sections": [
+    {
+      "id": "general",
+      "label": "General",
+      "icon": "settings-2",
+      "description": "How a player opens a store, and how the screen is dressed.",
+      "paths": [
+        "basic.interact",
+        "basic.background",
+        "basic.stopConflictingShops",
+        "basic.catchOxStores"
+      ]
+    },
+    {
+      "id": "theme",
+      "label": "Theme",
+      "icon": "palette",
+      "description": "Override the colours this script inherits from dirk_lib.",
+      "paths": [
+        "theme"
+      ]
+    },
+    {
+      "id": "payments",
+      "label": "Payment",
+      "icon": "wallet",
+      "description": "The ways a player can pay, and be paid.",
+      "paths": [
+        "paymentMethods"
+      ]
+    },
+    {
+      "id": "licences",
+      "label": "Licences",
+      "icon": "scroll-text",
+      "description": "The licences your city issues, and what needs one.",
+      "paths": [
+        "licenses"
+      ]
+    },
+    {
+      "id": "stores",
+      "label": "Stores",
+      "icon": "store",
+      "description": "Every shop: where it is, who runs it, what it sells.",
+      "paths": [
+        "stores"
+      ],
+      "workspace": true
+    }
+  ],
+  "x-managedElsewhere": [
+    "access"
+  ],
+  "properties": {
+    "basic": {
+      "type": "object",
+      "x-icon": "settings-2",
+      "properties": {
+        "interact": {
+          "type": "string",
+          "default": "target",
+          "enum": [
+            "target",
+            "interact"
+          ],
+          "x-enumLabels": {
+            "target": "Targeting (third-eye)",
+            "interact": "Interaction prompt"
+          },
+          "x-enumIcons": {
+            "target": "crosshair",
+            "interact": "square-mouse-pointer"
+          },
+          "description": "How a player opens the shopkeeper — your target resource, or dirk_lib's on-screen prompt."
+        },
+        "background": {
+          "type": "string",
+          "default": "themed",
+          "enum": [
+            "themed",
+            "dark",
+            "transparent"
+          ],
+          "x-enumLabels": {
+            "themed": "Tinted with your accent",
+            "dark": "Plain dark",
+            "transparent": "See the world behind"
+          },
+          "description": "What sits behind the store screen."
+        },
+        "catchOxStores": {
+          "type": "boolean",
+          "default": false,
+          "description": "Answer ox_inventory's shop exports so scripts that open an ox shop open this one instead. Leave off unless something on your server calls them."
+        },
+        "stopConflictingShops": {
+          "type": "boolean",
+          "default": true,
+          "description": "Stop the framework's own shop resources on start, so a counter does not end up with two shopkeepers on it. ox_inventory's built-in shops are part of the inventory and cannot be stopped — empty its data/shops.lua to remove those."
+        }
+      }
+    },
+    "theme": {
+      "type": "object",
+      "description": "Optional per-resource theme override. When it is on, every dirk_stores screen uses these colours instead of the global dirk_lib theme. A single store can still override this again on its own Look tab.",
+      "x-enabledWhen": {
+        "path": "theme.useOverride",
+        "equals": true
+      },
+      "default": {
+        "useOverride": false,
+        "primaryColor": "dirk",
+        "primaryShade": 5,
+        "customTheme": [
+          "#f0f4ff",
+          "#d9e3ff",
+          "#bfcfff",
+          "#a6bbff",
+          "#8ca7ff",
+          "#7393ff",
+          "#5a7fff",
+          "#406bff",
+          "#2547ff",
+          "#0b33ff"
+        ]
+      },
+      "properties": {
+        "useOverride": {
+          "type": "boolean",
+          "default": false,
+          "description": "Off means this script follows the global dirk_lib theme, so every dirk NUI matches. Turn it on only if you want stores to look different from the rest.",
+          "x-goTo": {
+            "resource": "dirk_lib",
+            "group": "appearance",
+            "label": "Change the global theme",
+            "when": false
+          }
+        },
+        "primaryColor": {
+          "x-control": "mantineColor",
+          "type": "string",
+          "default": "dirk",
+          "description": "Mantine palette name (or 'custom' to use the customTheme stops)."
+        },
+        "primaryShade": {
+          "x-control": "shade",
+          "type": "integer",
+          "default": 5,
+          "minimum": 0,
+          "maximum": 9,
+          "description": "Shade index 0-9 within the active palette."
+        },
+        "customTheme": {
+          "type": "array",
+          "default": [
+            "#f0f4ff",
+            "#d9e3ff",
+            "#bfcfff",
+            "#a6bbff",
+            "#8ca7ff",
+            "#7393ff",
+            "#5a7fff",
+            "#406bff",
+            "#2547ff",
+            "#0b33ff"
+          ],
+          "minItems": 10,
+          "maxItems": 10,
+          "description": "10-stop custom palette used when primaryColor = 'custom'.",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "access": {
+      "type": "object",
+      "x-serverOnly": true,
+      "x-icon": "shield-check",
+      "description": "Who (besides server admins) can open & edit this script's live config — additive on top of dirk_lib's master admins (the dirk_lib_master_group convar), never removes their access. Enforced SERVER-SIDE by dirk_lib. x-serverOnly so the grant list never leaves the server.",
+      "default": {
+        "groups": [],
+        "identifiers": []
+      },
+      "properties": {
+        "groups": {
+          "type": "array",
+          "default": [],
+          "description": "Job / gang / ACE group names granted config-edit access (checked via IsPlayerAceAllowed).",
+          "items": {
+            "type": "string"
+          }
+        },
+        "identifiers": {
+          "type": "array",
+          "default": [],
+          "description": "Specific players granted access — stored as the framework persistent id (citizenid on qb/qbx, license on esx).",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "paymentMethods": {
+      "type": "array",
+      "x-arrayKey": "id",
+      "x-itemTitle": "name",
+      "x-icon": "wallet",
+      "description": "Every way a store can take money, or hand it over. Stores pick from this list. A method whose behaviour is not just \"move money in an account\" is written in overrides/paymentMethods.lua and keyed by the same id.",
+      "x-rowOrder": [
+        "id",
+        "name",
+        "symbol",
+        "icon",
+        "kind",
+        "account",
+        "item"
+      ],
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "What stores refer to this method by, and the key an override in overrides/paymentMethods.lua uses. Changing it orphans every store that names it."
+          },
+          "name": {
+            "type": "string",
+            "description": "What the player sees on the payment switch."
+          },
+          "symbol": {
+            "type": "string",
+            "default": "$",
+            "description": "Printed before the amount. Use it for a currency that is not your server default — a crypto method reading ₿ tells the player what they are spending."
+          },
+          "icon": {
+            "type": "string",
+            "x-control": "icon",
+            "x-iconSet": "fontawesome",
+            "description": "Shown beside the name."
+          },
+          "kind": {
+            "type": "string",
+            "default": "account",
+            "enum": [
+              "account",
+              "item"
+            ],
+            "x-enumLabels": {
+              "account": "Framework account",
+              "item": "Inventory item"
+            },
+            "x-enumIcons": {
+              "account": "landmark",
+              "item": "package"
+            },
+            "description": "Whether paying moves money in a framework account, or hands over an item."
+          },
+          "account": {
+            "type": "string",
+            "x-control": "account",
+            "x-enabledWhen": {
+              "path": "self.kind",
+              "equals": "account"
+            },
+            "description": "The framework account the money moves in."
+          },
+          "item": {
+            "type": "string",
+            "x-itemPicker": true,
+            "x-enabledWhen": {
+              "path": "self.kind",
+              "equals": "item"
+            },
+            "description": "The item handed over, one per unit of price."
+          }
+        }
+      },
+      "default": [
+        {
+          "id": "cash",
+          "name": "Cash",
+          "symbol": "$",
+          "icon": "fas fa-money-bill-wave",
+          "kind": "account",
+          "account": "cash"
+        },
+        {
+          "id": "bank",
+          "name": "Card",
+          "symbol": "$",
+          "icon": "fas fa-credit-card",
+          "kind": "account",
+          "account": "bank"
+        },
+        {
+          "id": "black_money",
+          "name": "Black Money",
+          "symbol": "$",
+          "icon": "fas fa-skull-crossbones",
+          "kind": "account",
+          "account": "black_money"
+        }
+      ]
+    },
+    "stores": {
+      "type": "array",
+      "x-arrayKey": "id",
+      "x-itemTitle": "name",
+      "x-icon": "store",
+      "description": "Every shop on the map. Whether one can be opened at all — a licence check, a job check, a story beat — is behaviour, and lives in overrides/stores.lua keyed by the same id.",
+      "x-rowTabs": [
+        {
+          "id": "general",
+          "label": "General",
+          "icon": "info",
+          "keys": [
+            "type",
+            "id",
+            "name",
+            "description",
+            "icon"
+          ]
+        },
+        {
+          "id": "world",
+          "label": "World",
+          "icon": "map-pin",
+          "keys": [
+            "models",
+            "locations"
+          ]
+        },
+        {
+          "id": "blip",
+          "label": "Blip",
+          "icon": "map",
+          "keys": [
+            "blip"
+          ]
+        },
+        {
+          "id": "hours",
+          "label": "Hours",
+          "icon": "clock",
+          "keys": [
+            "openingHoursEnabled",
+            "openingHours"
+          ]
+        },
+        {
+          "id": "categories",
+          "label": "Categories",
+          "icon": "layout-grid",
+          "keys": [
+            "categories"
+          ]
+        },
+        {
+          "id": "stock",
+          "label": "Stock",
+          "icon": "package",
+          "keys": [
+            "paymentMethods",
+            "stock"
+          ]
+        },
+        {
+          "id": "access",
+          "label": "Who can shop",
+          "icon": "shield",
+          "keys": [
+            "groups",
+            "licenses"
+          ]
+        },
+        {
+          "id": "look",
+          "label": "Look",
+          "icon": "palette",
+          "keys": [
+            "theme"
+          ]
+        }
+      ],
+      "items": {
+        "type": "object",
+        "required": [
+          "type",
+          "id",
+          "name"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "default": "buy",
+            "enum": [
+              "buy",
+              "sell"
+            ],
+            "x-enumLabels": {
+              "buy": "Players buy from it",
+              "sell": "Players sell to it"
+            },
+            "x-enumIcons": {
+              "buy": "shopping-cart",
+              "sell": "hand-coins"
+            },
+            "description": "Which way the goods move."
+          },
+          "id": {
+            "type": "string",
+            "x-generateId": "store",
+            "description": "Unique id, used by exports and by overrides/stores.lua."
+          },
+          "name": {
+            "type": "string",
+            "description": "Shown in the header and on the blip.",
+            "x-action": {
+              "label": "Preview",
+              "icon": "eye",
+              "callback": "admin:previewStore",
+              "sendSection": false
+            }
+          },
+          "description": {
+            "type": "string",
+            "x-control": "text",
+            "description": "The line under the name."
+          },
+          "icon": {
+            "type": "string",
+            "x-control": "icon",
+            "x-iconSet": "fontawesome",
+            "description": "Shown beside the name."
+          },
+          "models": {
+            "type": "array",
+            "x-control": "peds",
+            "items": {
+              "type": "string"
+            },
+            "description": "Shopkeeper models. One is picked at random per location.",
+            "default": [
+              "mp_m_shopkeep_01"
+            ]
+          },
+          "locations": {
+            "type": "array",
+            "x-control": "positions",
+            "description": "Where the shopkeeper stands. Walk to the spot and press E rather than typing coordinates.",
+            "items": {
+              "type": "object",
+              "required": [
+                "x",
+                "y",
+                "z"
+              ],
+              "properties": {
+                "x": {
+                  "type": "number"
+                },
+                "y": {
+                  "type": "number"
+                },
+                "z": {
+                  "type": "number"
+                },
+                "w": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          "blip": {
+            "type": "object",
+            "description": "The map marker. Leave the sprite empty for a store with no blip at all.",
+            "properties": {
+              "sprite": {
+                "type": "integer",
+                "x-control": "blipSprite"
+              },
+              "color": {
+                "type": "integer",
+                "x-control": "blipColor"
+              },
+              "scale": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 2,
+                "default": 0.8,
+                "x-bandLabels": [
+                  "Tiny",
+                  "Small",
+                  "Normal",
+                  "Large",
+                  "Huge"
+                ]
+              },
+              "display": {
+                "type": "integer",
+                "x-control": "blipDisplay"
+              },
+              "shortRange": {
+                "type": "boolean",
+                "default": true,
+                "description": "Only show the blip once the player is nearby."
+              }
+            },
+            "default": {
+              "sprite": 52,
+              "color": 29,
+              "scale": 0.8,
+              "display": 4,
+              "shortRange": true
+            }
+          },
+          "openingHours": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "description": "When the shopkeeper is there. 0 to 24 is always open.",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 24
+            },
+            "default": [
+              0,
+              24
+            ],
+            "x-enabledWhen": {
+              "path": "self.openingHoursEnabled",
+              "equals": true
+            }
+          },
+          "paymentMethods": {
+            "type": "array",
+            "x-control": "pickList",
+            "x-optionsFrom": {
+              "path": "paymentMethods",
+              "key": "id",
+              "labelKey": "name"
+            },
+            "description": "Which of your payment methods this store accepts.",
+            "items": {
+              "type": "string"
+            },
+            "default": [
+              "cash",
+              "bank"
+            ]
+          },
+          "categories": {
+            "type": "array",
+            "x-itemTitle": "name",
+            "description": "Tabs across the top of the store. Leave empty and everything is shown in one list.",
+            "items": {
+              "type": "object",
+              "required": [
+                "name"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string",
+                  "x-control": "text"
+                },
+                "icon": {
+                  "type": "string",
+                  "x-control": "icon",
+                  "x-iconSet": "fontawesome"
+                }
+              }
+            },
+            "default": []
+          },
+          "stock": {
+            "type": "array",
+            "x-itemTitle": "name",
+            "description": "What is on the shelves. A sell store buys these off the player at the same price.",
+            "items": {
+              "type": "object",
+              "required": [
+                "name",
+                "price"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "x-itemPicker": true,
+                  "description": "The inventory item. Its name and picture come from your inventory, not from here."
+                },
+                "category": {
+                  "type": "string",
+                  "x-control": "pickOne",
+                  "x-optionsFrom": {
+                    "path": "parent.categories",
+                    "key": "name",
+                    "labelKey": "name"
+                  },
+                  "x-anyLabel": "Uncategorised"
+                },
+                "price": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Per unit."
+                },
+                "stock": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "How many are on the shelf. Leave empty for unlimited."
+                },
+                "groups": {
+                  "type": "object",
+                  "x-control": "groupGrades",
+                  "additionalProperties": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "description": "Only these jobs or gangs may buy this line, at the rank you set or above."
+                },
+                "licenses": {
+                  "type": "array",
+                  "x-control": "pickList",
+                  "x-optionsFrom": {
+                    "path": "licenses",
+                    "key": "id",
+                    "labelKey": "label"
+                  },
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Licences the player must hold to buy this line."
+                }
+              }
+            },
+            "default": []
+          },
+          "groups": {
+            "type": "object",
+            "x-control": "groupGrades",
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "description": "Only these jobs or gangs may open the store at all, at the rank you set or above. Leave it empty and anyone may."
+          },
+          "licenses": {
+            "type": "array",
+            "x-control": "pickList",
+            "x-optionsFrom": {
+              "path": "licenses",
+              "key": "id",
+              "labelKey": "label"
+            },
+            "items": {
+              "type": "string"
+            },
+            "description": "Licences the player must hold to open the store at all."
+          },
+          "theme": {
+            "type": "object",
+            "description": "Optional per-store theme override. When it is on, this one store uses these colours instead of whatever the rest of dirk_stores is using.",
+            "x-enabledWhen": {
+              "path": "self.theme.useOverride",
+              "equals": true
+            },
+            "default": {
+              "useOverride": false,
+              "primaryColor": "dirk",
+              "primaryShade": 5,
+              "customTheme": [
+                "#f0f4ff",
+                "#d9e3ff",
+                "#bfcfff",
+                "#a6bbff",
+                "#8ca7ff",
+                "#7393ff",
+                "#5a7fff",
+                "#406bff",
+                "#2547ff",
+                "#0b33ff"
+              ]
+            },
+            "properties": {
+              "useOverride": {
+                "type": "boolean",
+                "default": false,
+                "description": "Off means this store follows the dirk_stores theme, so every shop matches. Turn it on only if you want this one to look different."
+              },
+              "primaryColor": {
+                "type": "string",
+                "default": "dirk",
+                "x-control": "mantineColor",
+                "description": "The theme colour, or custom to use the palette below."
+              },
+              "primaryShade": {
+                "type": "integer",
+                "default": 5,
+                "minimum": 0,
+                "maximum": 9,
+                "x-control": "shade",
+                "description": "How light or dark the colour is."
+              },
+              "customTheme": {
+                "type": "array",
+                "minItems": 10,
+                "maxItems": 10,
+                "default": [
+                  "#f0f4ff",
+                  "#d9e3ff",
+                  "#bfcfff",
+                  "#a6bbff",
+                  "#8ca7ff",
+                  "#7393ff",
+                  "#5a7fff",
+                  "#406bff",
+                  "#2547ff",
+                  "#0b33ff"
+                ],
+                "description": "Ten steps from light to dark, used when the colour is custom.",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "openingHoursEnabled": {
+            "type": "boolean",
+            "default": false,
+            "description": "Off means the shopkeeper is always there. On lets you set the hours they work."
+          }
+        }
+      },
+      "default": [
+        {
+          "type": "buy",
+          "id": "supermarket247",
+          "name": "24/7 Store",
+          "description": "For low quality products at incredibly marked up prices, we have you covered!",
+          "icon": "fas fa-store",
+          "models": [
+            "mp_m_shopkeep_01"
+          ],
+          "locations": [
+            {
+              "x": 24.47,
+              "y": -1346.62,
+              "z": 29.5,
+              "w": 271.66
+            },
+            {
+              "x": -3039.54,
+              "y": 584.38,
+              "z": 7.91,
+              "w": 17.27
+            },
+            {
+              "x": -3244.4020996094,
+              "y": 1000.1966552734,
+              "z": 12.8307056427,
+              "w": 353.50509643555
+            },
+            {
+              "x": 1728.07,
+              "y": 6415.63,
+              "z": 35.04,
+              "w": 242.95
+            },
+            {
+              "x": 1959.82,
+              "y": 3740.48,
+              "z": 32.34,
+              "w": 301.57
+            },
+            {
+              "x": 549.13,
+              "y": 2670.85,
+              "z": 42.16,
+              "w": 99.39
+            },
+            {
+              "x": 2677.47,
+              "y": 3279.76,
+              "z": 55.24,
+              "w": 335.08
+            },
+            {
+              "x": 2556.66,
+              "y": 380.84,
+              "z": 108.62,
+              "w": 356.67
+            },
+            {
+              "x": 372.66,
+              "y": 326.98,
+              "z": 103.57,
+              "w": 253.73
+            }
+          ],
+          "blip": {
+            "color": 27,
+            "scale": 0.8,
+            "sprite": 52,
+            "display": 2,
+            "shortRange": true
+          },
+          "paymentMethods": [
+            "cash",
+            "bank"
+          ],
+          "categories": [
+            {
+              "name": "Drinks",
+              "description": "Refreshing beverages to quench your thirst.",
+              "icon": "fas fa-cocktail"
+            },
+            {
+              "name": "Food",
+              "description": "Delicious meals to satisfy your hunger.",
+              "icon": "fas fa-hamburger"
+            },
+            {
+              "name": "Snacks",
+              "description": "Quick bites to keep you going.",
+              "icon": "fas fa-cookie"
+            }
+          ],
+          "stock": [
+            {
+              "name": "water",
+              "price": 1,
+              "category": "Drinks"
+            },
+            {
+              "name": "bread",
+              "price": 2,
+              "category": "Food"
+            },
+            {
+              "name": "burger",
+              "price": 5,
+              "category": "Food",
+              "stock": 3
+            },
+            {
+              "name": "cola",
+              "price": 1,
+              "category": "Drinks"
+            }
+          ],
+          "openingHoursEnabled": false
+        },
+        {
+          "type": "buy",
+          "id": "ltdGasoline",
+          "name": "LTD Gasoline",
+          "description": "Watered down gas and overpriced snacks, what more could you want?",
+          "icon": "fas fa-gas-pump",
+          "models": [
+            "mp_m_shopkeep_01"
+          ],
+          "locations": [
+            {
+              "x": -48.5,
+              "y": -1757.5,
+              "z": 29.42,
+              "w": 0
+            },
+            {
+              "x": -709.17,
+              "y": -909.56,
+              "z": 19.22,
+              "w": 0
+            },
+            {
+              "x": 1166.02,
+              "y": -321.2,
+              "z": 69.21,
+              "w": 0
+            },
+            {
+              "x": -1437.62,
+              "y": -276.74,
+              "z": 46.21,
+              "w": 0
+            },
+            {
+              "x": 1698.45,
+              "y": 4924.15,
+              "z": 42.06,
+              "w": 0
+            },
+            {
+              "x": -1820.33,
+              "y": 794.45,
+              "z": 138.09,
+              "w": 0
+            }
+          ],
+          "blip": {
+            "color": 29,
+            "scale": 0.8,
+            "sprite": 52,
+            "display": 2,
+            "shortRange": true
+          },
+          "paymentMethods": [
+            "cash",
+            "bank"
+          ],
+          "categories": [
+            {
+              "name": "Drinks",
+              "description": "Refreshing beverages to quench your thirst.",
+              "icon": "fas fa-cocktail"
+            },
+            {
+              "name": "Food",
+              "description": "Delicious meals to satisfy your hunger.",
+              "icon": "fas fa-hamburger"
+            },
+            {
+              "name": "Snacks",
+              "description": "Quick bites to keep you going.",
+              "icon": "fas fa-cookie"
+            }
+          ],
+          "stock": [
+            {
+              "name": "water",
+              "price": 1,
+              "category": "Drinks"
+            },
+            {
+              "name": "bread",
+              "price": 2,
+              "category": "Food"
+            },
+            {
+              "name": "burger",
+              "price": 5,
+              "category": "Food",
+              "stock": 3
+            },
+            {
+              "name": "cola",
+              "price": 1,
+              "category": "Drinks"
+            }
+          ],
+          "openingHoursEnabled": false
+        },
+        {
+          "type": "buy",
+          "id": "robsLiquor",
+          "name": "Robs Liquor",
+          "description": "We don't sell alcohol, we sell happiness in a bottle!",
+          "icon": "fas fa-wine-glass-alt",
+          "models": [
+            "mp_m_shopkeep_01"
+          ],
+          "locations": [
+            {
+              "x": 1134.44,
+              "y": -982.64,
+              "z": 46.41,
+              "w": 269.09
+            },
+            {
+              "x": -1750.26,
+              "y": 282.6,
+              "z": 88.13,
+              "w": 226.6
+            },
+            {
+              "x": -2968.78,
+              "y": 390.46,
+              "z": 15.04,
+              "w": 11.26
+            },
+            {
+              "x": 1167.47,
+              "y": 2709.56,
+              "z": 38.15,
+              "w": 88.36
+            },
+            {
+              "x": -1486.31,
+              "y": -378.05,
+              "z": 40.16,
+              "w": 85.9
+            },
+            {
+              "x": -1223.49,
+              "y": -908.33,
+              "z": 11.33,
+              "w": 125.71
+            }
+          ],
+          "blip": {
+            "color": 29,
+            "scale": 0.8,
+            "sprite": 52,
+            "display": 2,
+            "shortRange": true
+          },
+          "paymentMethods": [
+            "cash",
+            "bank"
+          ],
+          "categories": [
+            {
+              "name": "Drinks",
+              "description": "Refreshing beverages to quench your thirst.",
+              "icon": "fas fa-cocktail"
+            },
+            {
+              "name": "Food",
+              "description": "Delicious meals to satisfy your hunger.",
+              "icon": "fas fa-hamburger"
+            },
+            {
+              "name": "Snacks",
+              "description": "Quick bites to keep you going.",
+              "icon": "fas fa-cookie"
+            }
+          ],
+          "stock": [
+            {
+              "name": "water",
+              "price": 1,
+              "category": "Drinks"
+            },
+            {
+              "name": "bread",
+              "price": 2,
+              "category": "Food"
+            },
+            {
+              "name": "burger",
+              "price": 5,
+              "category": "Food",
+              "stock": 3
+            },
+            {
+              "name": "cola",
+              "price": 1,
+              "category": "Drinks"
+            }
+          ],
+          "openingHoursEnabled": false
+        },
+        {
+          "type": "buy",
+          "id": "hardware",
+          "name": "Hardware Store",
+          "description": "Your one-stop shop for all things hardware, from tools to building materials!",
+          "icon": "fas fa-tools",
+          "models": [
+            "mp_m_shopkeep_01"
+          ],
+          "locations": [
+            {
+              "x": 2747.8264160156,
+              "y": 3472.0263671875,
+              "z": 55.674186706543,
+              "w": 259.00454711914
+            }
+          ],
+          "blip": {
+            "color": 29,
+            "scale": 0.8,
+            "sprite": 52,
+            "display": 2,
+            "shortRange": true
+          },
+          "paymentMethods": [
+            "cash",
+            "bank"
+          ],
+          "stock": [
+            {
+              "name": "crowbar",
+              "price": 400,
+              "stock": 150
+            },
+            {
+              "name": "lockpick",
+              "price": 200,
+              "stock": 50
+            },
+            {
+              "name": "weapon_wrench",
+              "price": 250,
+              "stock": 250
+            },
+            {
+              "name": "weapon_hammer",
+              "price": 250,
+              "stock": 250
+            },
+            {
+              "name": "repairkit",
+              "price": 250,
+              "stock": 50,
+              "groups": {
+                "mechanic": 0,
+                "police": 0
+              }
+            },
+            {
+              "name": "screwdriverset",
+              "price": 350,
+              "stock": 50
+            },
+            {
+              "name": "phone",
+              "price": 850,
+              "stock": 50
+            },
+            {
+              "name": "radio",
+              "price": 250,
+              "stock": 50
+            },
+            {
+              "name": "binoculars",
+              "price": 50,
+              "stock": 50
+            },
+            {
+              "name": "firework1",
+              "price": 50,
+              "stock": 50
+            },
+            {
+              "name": "firework2",
+              "price": 50,
+              "stock": 50
+            },
+            {
+              "name": "firework3",
+              "price": 50,
+              "stock": 50
+            },
+            {
+              "name": "firework4",
+              "price": 50,
+              "stock": 50
+            },
+            {
+              "name": "cleaningkit",
+              "price": 150,
+              "stock": 150
+            },
+            {
+              "name": "advancedrepairkit",
+              "price": 500,
+              "stock": 50,
+              "groups": {
+                "mechanic": 0
+              }
+            }
+          ],
+          "openingHoursEnabled": false
+        },
+        {
+          "type": "buy",
+          "id": "ammunation",
+          "name": "Ammunation",
+          "description": "Faulty firearms and overpriced ammunition, what more could you want?",
+          "icon": "fas fa-gun",
+          "models": [
+            "mp_m_shopkeep_01"
+          ],
+          "locations": [
+            {
+              "x": 22.470691680908,
+              "y": -1105.3994140625,
+              "z": 29.797008514404,
+              "w": 162.98078918457
+            },
+            {
+              "x": 810.22869873047,
+              "y": -2159.1435546875,
+              "z": 29.619016647339,
+              "w": 356.72598266602
+            },
+            {
+              "x": 841.48986816406,
+              "y": -1035.3930664062,
+              "z": 28.194864273071,
+              "w": 355.58792114258
+            },
+            {
+              "x": -661.33892822266,
+              "y": -933.61248779297,
+              "z": 21.829238891602,
+              "w": 173.55712890625
+            },
+            {
+              "x": -1304.2788085938,
+              "y": -395.05575561523,
+              "z": 36.695762634277,
+              "w": 79.229972839355
+            },
+            {
+              "x": 1692.5540771484,
+              "y": 3761.21484375,
+              "z": 34.705318450928,
+              "w": 228.0951385498
+            },
+            {
+              "x": -330.87115478516,
+              "y": 6085.748046875,
+              "z": 31.454778671265,
+              "w": 221.40034484863
+            },
+            {
+              "x": -1118.2666015625,
+              "y": 2700.38671875,
+              "z": 18.554151535034,
+              "w": 219.1848449707
+            },
+            {
+              "x": 2566.9125976562,
+              "y": 292.54739379883,
+              "z": 108.73485565186,
+              "w": 354.51898193359
+            },
+            {
+              "x": -3173.2419433594,
+              "y": 1089.140625,
+              "z": 20.838743209839,
+              "w": 249.56518554688
+            }
+          ],
+          "blip": {
+            "color": 0,
+            "scale": 0.8,
+            "sprite": 110,
+            "display": 2,
+            "shortRange": true
+          },
+          "paymentMethods": [
+            "cash",
+            "bank"
+          ],
+          "categories": [
+            {
+              "name": "Melee Weapons",
+              "description": "Close combat weapons",
+              "icon": "fas fa-fist-raised"
+            },
+            {
+              "name": "Firearms",
+              "description": "Rifles, shotguns, and handguns",
+              "icon": "fas fa-bullseye"
+            },
+            {
+              "name": "Ammunition",
+              "description": "Bullets and shells.",
+              "icon": "fas fa-bullet"
+            },
+            {
+              "name": "Accessories",
+              "description": "Scopes, suppressors and more.",
+              "icon": "fas fa-tools"
+            }
+          ],
+          "stock": [
+            {
+              "name": "weapon_pistol",
+              "price": 1500,
+              "category": "Firearms",
+              "licenses": [
+                "weapon"
+              ]
+            },
+            {
+              "name": "weapon_snspistol",
+              "price": 2000,
+              "category": "Firearms"
+            },
+            {
+              "name": "weapon_vintagepistol",
+              "price": 2500,
+              "category": "Firearms"
+            },
+            {
+              "name": "weapon_bat",
+              "price": 100,
+              "category": "Melee Weapons"
+            },
+            {
+              "name": "weapon_hatchet",
+              "price": 300,
+              "category": "Melee Weapons"
+            },
+            {
+              "name": "weapon_knife",
+              "price": 50,
+              "category": "Melee Weapons"
+            },
+            {
+              "name": "ammo_pistol",
+              "price": 50,
+              "category": "Ammunition"
+            },
+            {
+              "name": "ammo_shotgun",
+              "price": 75,
+              "category": "Ammunition"
+            },
+            {
+              "name": "weapon_flashlight",
+              "price": 100,
+              "category": "Accessories"
+            },
+            {
+              "name": "weapon_suppressor",
+              "price": 500,
+              "category": "Accessories"
+            }
+          ],
+          "openingHoursEnabled": false
+        },
+        {
+          "type": "sell",
+          "id": "pawnshop",
+          "name": "Pawn Shop",
+          "description": "We buy anything and everything, no questions asked!",
+          "icon": "fas fa-hand-holding-dollar",
+          "models": [
+            "mp_m_shopkeep_01"
+          ],
+          "locations": [
+            {
+              "x": 412.30889892578,
+              "y": 314.85986328125,
+              "z": 103.13275909424,
+              "w": 214.03395080566
+            }
+          ],
+          "blip": {
+            "color": 46,
+            "scale": 0.8,
+            "sprite": 365,
+            "display": 2,
+            "shortRange": true
+          },
+          "paymentMethods": [
+            "cash",
+            "bank"
+          ],
+          "categories": [
+            {
+              "name": "Drinks",
+              "description": "Refreshing beverages to quench your thirst.",
+              "icon": "fas fa-cocktail"
+            },
+            {
+              "name": "Food",
+              "description": "Delicious meals to satisfy your hunger.",
+              "icon": "fas fa-hamburger"
+            },
+            {
+              "name": "Snacks",
+              "description": "Quick bites to keep you going.",
+              "icon": "fas fa-cookie"
+            }
+          ],
+          "stock": [
+            {
+              "name": "water",
+              "price": 1,
+              "category": "Drinks"
+            },
+            {
+              "name": "bread",
+              "price": 2,
+              "category": "Food"
+            },
+            {
+              "name": "burger",
+              "price": 5,
+              "category": "Food",
+              "stock": 3
+            },
+            {
+              "name": "cola",
+              "price": 1,
+              "category": "Drinks"
+            }
+          ],
+          "theme": {
+            "useOverride": true,
+            "primaryColor": "red",
+            "primaryShade": 9
+          },
+          "openingHoursEnabled": false
+        }
+      ]
+    },
+    "licenses": {
+      "type": "array",
+      "x-arrayKey": "id",
+      "x-itemTitle": "label",
+      "x-icon": "scroll-text",
+      "description": "The licences your city issues. Stores and individual stock lines pick from this list. Whether a player HOLDS one is asked of your framework, or of overrides/licenses.lua when your licence system is not one dirk_lib knows.",
+      "x-rowOrder": [
+        "id",
+        "label",
+        "description"
+      ],
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "label"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The name your licence system stores it under. This is what gets checked."
+          },
+          "label": {
+            "type": "string",
+            "description": "What the player is told they need."
+          },
+          "description": {
+            "type": "string",
+            "x-control": "text",
+            "description": "A note for you. Not shown in game."
+          }
+        }
+      },
+      "default": [
+        {
+          "id": "weapon",
+          "label": "Firearms Licence",
+          "description": "Needed to buy guns and ammunition."
+        },
+        {
+          "id": "driver",
+          "label": "Driving Licence",
+          "description": "Needed to buy or drive a vehicle."
+        },
+        {
+          "id": "business",
+          "label": "Business Licence",
+          "description": "Needed to trade commercially."
+        }
+      ]
+    }
+  }
+}

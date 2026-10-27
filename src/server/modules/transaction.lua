@@ -1,106 +1,106 @@
-local paymentMethods = require 'settings.paymentMethods'
-local metadataGenerators = require 'settings.metadataGenerators'
+local metadataGenerators = require 'overrides.metadataGenerators'
+local storeOverrides = require 'overrides.stores'
 
+--- Check the cart line by line before anything moves.
+---@return boolean, string|nil reason, number total
+function Store:priceCart(src, cart)
+  local total = 0
 
-function Store:canAccessItem(src, item)
+  for _, entry in ipairs(cart) do
+    local line = self:getItemByListingId(entry.id)
+    if not line then return false, 'NoItemById', 0 end
 
+    local quantity = math.floor(tonumber(entry.quantity) or 0)
+    if quantity <= 0 then return false, 'NoItemById', 0 end
 
-  if item.groups then 
+    if self:lineRestriction(src, line) then
+      return false, 'ItemAccessDenied', 0
+    end
 
-  end 
+    if self.type == 'sell' then
+      if not lib.inventory.hasItem(src, line.name, quantity) then
+        return false, 'NotEnoughItem', 0
+      end
+    elseif line.stock and quantity > line.stock then
+      return false, 'OutOfStock', 0
+    end
 
-  if item.licenses then 
+    total += line.price * quantity
+  end
 
-  end 
-
-  return true
+  return true, nil, total
 end
 
-function Store:attemptTransaction(src, cart, payment_method)
-  local totalPrice = 0
-  for k,v in pairs(cart) do
-    local item = self:getItemByListingId(v.id)
-    
-    if not item then 
-      return false, 'no_item_by_id'
-    end
-
-    if not self:canAccessItem(src, item) then
-      return false, 'item_access_denied'
-    end
-
-    if item.stock and v.quantity > item.stock then
-      return false, 'not_enough_stock'
-    end
-
-    if self.type == 'sell' and not lib.inventory.hasItem(src, item.name, v.quantity) then
-      return false, 'not_enough_item'
-    end
-
-    totalPrice += item.price * v.quantity 
+function Store:attemptTransaction(src, cart, paymentMethodId)
+  if type(cart) ~= 'table' or #cart == 0 then
+    return false, 'EmptyCart'
   end
 
+  local priced, reason, total = self:priceCart(src, cart)
+  if not priced then return false, reason end
 
-  if self.canExchange then 
-    local canExchange, reason = self.canExchange(src, cart, totalPrice)
-    if not canExchange then
-      return false, reason
-    end
+  local method = Payment.get(paymentMethodId)
+  if not method then return false, 'InvalidPaymentMethod' end
+
+  -- A store only offers the methods it accepts, but the request is a net
+  -- event, so the client's word for which one was used is not enough.
+  local accepted = false
+  for _, id in ipairs(self.paymentMethods or {}) do
+    if id == paymentMethodId then accepted = true break end
   end
-  
-  --## Payment method
-  local paymentMethod = paymentMethods[payment_method]
-  if not paymentMethod then
-    return false, 'invalid_payment_method'
+  if not accepted then return false, 'InvalidPaymentMethod' end
+
+  local override = storeOverrides[self.id]
+  if override and override.canExchange then
+    local allowed, why = override.canExchange(src, cart, total)
+    if not allowed then return false, why or 'TransactionFailed' end
   end
 
-  if self.type == 'sell' then 
-    --## Remove all items and add money
-    for k,v in pairs(cart) do
-      local item = self:getItemByListingId(v.id)
-      if not lib.inventory.removeItem(src, item.name, v.quantity) then 
+  if self.type == 'sell' then
+    -- Take the goods FIRST. Paying first and then failing to remove the item
+    -- is the one ordering that hands out free money.
+    for _, entry in ipairs(cart) do
+      local line = self:getItemByListingId(entry.id)
+      if not lib.inventory.removeItem(src, line.name, entry.quantity) then
         return false, 'SellItemFailedNoItem'
       end
     end
-    paymentMethod.add(src, totalPrice)
-  elseif self.type == 'buy' then 
-    local removed, reason = paymentMethod.remove(src, totalPrice)
-    if not removed then
-      return false, 'PaymentFailedNoMoney'
+
+    if not Payment.add(src, method, total) then
+      return false, 'TransactionFailed'
     end
-  end   
-
-
-
-  for k,v in pairs(cart) do
-    self:updateStockByListingId(v.id, -v.quantity)
+  else
+    local paid, why = Payment.remove(src, method, total)
+    if not paid then return false, why or 'PaymentFailedNoMoney' end
   end
 
-  if self.onExchange then
-    local allow, reason = self.onExchange(src, cart, totalPrice)
-    if not allow then
-      return false, reason
-    end 
+  if override and override.onExchange then
+    local allowed, why = override.onExchange(src, cart, total)
+    if not allowed then return false, why or 'TransactionFailed' end
   end
 
-  for k,v in pairs(cart) do
-    local item = self:getItemByListingId(v.id)
-    if self.type == 'sell' then 
-      lib.inventory.removeItem(src, item.name, v.quantity)
-    else 
-      local metadataGenerator = metadataGenerators[item.name]
-      if metadataGenerator then 
-        for i= 1, v.quantity do
-          local metadata = metadataGenerator()
+  for _, entry in ipairs(cart) do
+    self:updateStockByListingId(entry.id, -entry.quantity)
+  end
+
+  if self.type == 'buy' then
+    for _, entry in ipairs(cart) do
+      local line = self:getItemByListingId(entry.id)
+      local generator = metadataGenerators[line.name]
+
+      if generator then
+        -- A generated item is unique, so it is handed over one at a time.
+        for _ = 1, entry.quantity do
+          local metadata = generator(src)
           if not metadata then
-            lib.print.error(('Metadata generator for item %s returned nil'):format(item.name))
-            return false, 'metadata_generation_failed'
+            lib.print.error(('Metadata generator for item %s returned nil'):format(line.name))
+            return false, 'MetadataGenerationFailed'
           end
-          lib.inventory.addItem(src, item.name, 1, metadata)
+          lib.inventory.addItem(src, line.name, 1, metadata)
         end
       else
-        lib.inventory.addItem(src, item.name, v.quantity, item.metadata)
-      end 
+        lib.inventory.addItem(src, line.name, entry.quantity, line.metadata)
+      end
     end
   end
 
@@ -113,13 +113,15 @@ function Store:attemptTransaction(src, cart, payment_method)
   return true
 end
 
-lib.callback.register('dirk_stores:attemptTransaction', function(src, store_id, cart, payment_method)
-  local src = source
-  local store = Store.get(store_id)
-  if not store then return end
-  if not store:canAccessStore(src) then
-    lib.print.error(('Player %s attempted to access store %s without permission'):format(src, store_id))
-    return false, locale('StoreAccessDenied')
+lib.callback.register('dirk_stores:attemptTransaction', function(src, storeId, cart, paymentMethodId)
+  local store = Store.get(storeId)
+  if not store then return false, 'StoreNotFound' end
+
+  local canAccess, reason = store:canAccessStore(src)
+  if not canAccess then
+    lib.print.warn(('Player %s attempted to buy from store %s without access (%s)'):format(src, storeId, tostring(reason)))
+    return false, reason or 'StoreAccessDenied'
   end
-  return store:attemptTransaction(src, cart, payment_method)
+
+  return store:attemptTransaction(src, cart, paymentMethodId)
 end)

@@ -1,6 +1,3 @@
-body.game-rdr3 .mantine-Notifications-notification {
-  -webkit-mask-image: url('https://raw.githubusercontent.com/Jump-On-Studios/RedM-jo_libs/af7545b6840972aa403287280346bbd1b8c443aa/source-repositories/Menu/public/assets/images/background.png');
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-size: 100% 100%;
-  -webkit-mask-composite: source-in;
-}
+/* Nothing global left to say — fonts, scrollbars and notification styling all
+   come from dirk-cfx-react's DirkProvider now. Kept as the one place to put a
+   genuinely global rule if this screen ever needs one. */

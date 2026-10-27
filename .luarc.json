@@ -1,0 +1,58 @@
+{
+  "$schema": "https://raw.githubusercontent.com/LuaLS/vscode-lua/master/setting/schema.json",
+
+  "runtime.version": "Lua 5.4",
+  "runtime.pathStrict": true,
+  "runtime.special": { "lib.load": "require" },
+  "runtime.nonstandardSymbol": [
+    "/**/", "`", "+=", "-=", "*=", "/=", "<<=", ">>=", "&=", "|=", "^="
+  ],
+
+  "workspace.library": [
+    "c:/Users/Administrator/.vscode/extensions/overextended.cfxlua-vscode-1.10.5/plugin/library/natives",
+    "c:/Users/Administrator/.vscode/extensions/overextended.cfxlua-vscode-1.10.5/plugin/library/runtime",
+    "../dirk_lib/types"
+  ],
+
+  "workspace.ignoreDir": [
+    ".vscode",
+    ".git",
+    ".github",
+    "node_modules",
+    "web"
+  ],
+
+  "diagnostics.globals": [
+    "lib",
+    "cache",
+    "context",
+    "exports",
+    "scriptConfig",
+
+    "fx_version",
+    "game",
+    "games",
+    "lua54",
+    "rdr3_warning",
+    "author",
+    "description",
+    "version",
+    "repository",
+    "shared_script",
+    "shared_scripts",
+    "client_script",
+    "client_scripts",
+    "server_script",
+    "server_scripts",
+    "ui_page",
+    "file",
+    "files",
+    "dependency",
+    "dependencies",
+    "escrow_ignore",
+    "dirk_lib",
+    "provide"
+  ],
+
+  "diagnostics.disable": ["duplicate-set-field"]
+}

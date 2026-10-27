@@ -1,98 +1,113 @@
-local paymentMethods = require 'settings.paymentMethods'
+local storeOverrides = require 'overrides.stores'
 
 function Store:ensureNearby(src)
-  if not self.locations or #self.locations == 0 then 
-    return true -- No locations defined, so no need to check proximity
-  end
+  -- A store with no locations is opened by another resource's own logic
+  -- (an export, an ox shop), so there is no counter to stand at.
+  if not self.locations or #self.locations == 0 then return true end
 
   local playerPos = GetEntityCoords(GetPlayerPed(src))
-  local foundNearby = false
   for _, location in pairs(self.locations) do
-    local distance = #(playerPos - location.xyz)
-    if distance < 5.0 then
-      foundNearby = true
-      break
+    if #(playerPos - vector3(location.x, location.y, location.z)) < 5.0 then
+      return true
     end
   end
 
-  if not foundNearby then 
-    return false, 'NotNearStore'
-  end
-  return true
+  return false, 'NotNearStore'
 end
 
+--[[
+  Opening hours are checked on the CLIENT, not here.
 
+  `GetClockHours` is a client native — there is no game clock on a FiveM
+  server unless a weather-sync resource happens to publish one, and which
+  resource that is differs per server. Calling it here threw on every open,
+  and because the error made the callback return nothing, the player was told
+  the generic "not serving right now" rather than anything true.
 
+  So the hours gate the blip, the prompt and the open, all client-side, and
+  the server does not pretend to know the time. A modified client could shop
+  out of hours; it could not buy anything it is not allowed to buy, which is
+  what the rest of these checks are for.
+]]
 function Store:canAccessStore(src)
+  local nearby, reason = self:ensureNearby(src)
+  if not nearby then return false, reason end
 
-  if not self:ensureNearby(src) then 
-    return false, 'NotNearStore'
-  end
-
-  if not lib.player.hasGroup(src, self.groups) then
+  if not hasGroups(src, self.groups) then
     return false, 'StoreAccessDeniedGroup'
   end
 
-  if not lib.player.hasLicense(src, self.licenses) then
-    return false, 'StoreAccessDeniedLicense'
-  end 
+  local licensed, missing = hasLicences(src, self.licenses)
+  if not licensed then
+    return false, 'StoreAccessDeniedLicense', licenceLabel(missing)
+  end
 
-  if self.canOpen then 
-    local success, reason = self.canOpen(src)
-    if not success then
-      return false, reason or 'CannotOpenCustom'
-    end 
-  end 
+  local override = storeOverrides[self.id]
+  if override and override.canOpen then
+    local allowed, why = override.canOpen(src)
+    if not allowed then return false, why or 'CannotOpenCustom' end
+  end
 
   return true
 end
 
-
-function Store:openStore(src)
-  local canAccess, _error = self:canAccessStore(src)
-  if not canAccess then
-    return false, _error
+--- Can this player buy this particular line?
+---@return table|nil the reason it is greyed out, or nil when it is available
+function Store:lineRestriction(src, line)
+  -- `kind` rather than an icon class: the reason is the fact, and the screen
+  -- decides how to draw it. A locked line looks different from an empty shelf.
+  if not hasGroups(src, line.groups) then
+    return { kind = 'group', message = locale('GroupRestricted') }
   end
 
-  self.usingStore[src] = true
-  local stock = {}
-  for k,v in ipairs(self.stock) do
-    local itemData = {
-      id          = v.id,
-      name        = v.name,
-      price       = v.price,
-      icon        = v.icon,
-      category    = v.category,
-      label       = v.label,
-      description = v.description,
-      licenses     = v.licenses,
-      groups      = v.groups,
-      stock       = self.type == 'sell' and (lib.inventory.hasItem(src, v.name) or 0) or v.stock,
-    }
-
-    if self.type == 'sell' then 
-      local hasItem = lib.inventory.hasItem(src, v.name)
-      if hasItem and hasItem > 0 then 
-        itemData.stock = hasItem
-      else 
-        itemData.disabled = {
-          icon = 'fas fa-ban',
-          message = locale('DontHaveItem')
-        }
-      end
-    else 
-      if v.stock and v.stock <= 0 then 
-        itemData.disabled = {
-          icon = 'fas fa-ban',
-          message = locale('OutOfStock')
-        }
-      end 
-    end 
-    table.insert(stock, itemData)
+  -- Name the licence they are short of. "You need a licence" tells a player
+  -- nothing they can act on; "You need a Firearms Licence" does.
+  local licensed, missing = hasLicences(src, line.licenses)
+  if not licensed then
+    return { kind = 'license', message = locale('LicenseRestrictedNamed', licenceLabel(missing)) }
   end
-  return true, stock
 end
 
+function Store:openStore(src)
+  local canAccess, reason, detail = self:canAccessStore(src)
+  if not canAccess then return false, reason, detail end
+
+  self.usingStore[src] = true
+
+  local selling = self.type == 'sell'
+  local stock = {}
+
+  for _, line in ipairs(self.stock) do
+    local entry = {
+      id          = line.id,
+      name        = line.name,
+      price       = line.price,
+      category    = line.category,
+      label       = line.label,
+      description = line.description,
+    }
+
+    if selling then
+      -- In a sell store "stock" is what the PLAYER has to offer, not what the
+      -- shop holds — so a line they own none of is the one to grey out.
+      local held = lib.inventory.hasItem(src, line.name) or 0
+      entry.stock = held
+      if held <= 0 then
+        entry.disabled = { kind = 'stock', message = locale('DontHaveItem') }
+      end
+    else
+      entry.stock = line.stock
+      if line.stock and line.stock <= 0 then
+        entry.disabled = { kind = 'stock', message = locale('OutOfStock') }
+      end
+    end
+
+    entry.disabled = entry.disabled or self:lineRestriction(src, line)
+    stock[#stock + 1] = entry
+  end
+
+  return true, stock
+end
 
 lib.callback.register('dirk_stores:openStore', function(src, storeId)
   local store = Store.get(storeId)
@@ -109,7 +124,3 @@ RegisterNetEvent('dirk_stores:closeStore', function(storeId)
   if not store then return end
   store:closedStore(source)
 end)
-
-
-
-
